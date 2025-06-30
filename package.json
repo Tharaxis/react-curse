@@ -1,63 +1,26 @@
 {
-  "name": "react-curse",
+  "name": "react-curse-ex",
   "version": "1.0.17",
   "description": "A curses-like blazingly fast react renderer",
-  "keywords": [
-    "ansi",
-    "ascii",
-    "blessed",
-    "cli",
-    "console",
-    "cursed",
-    "curses",
-    "gui",
-    "ncurses",
-    "ranger",
-    "react",
-    "renderer",
-    "term",
-    "terminal",
-    "tmux",
-    "tui",
-    "unicode",
-    "vim",
-    "xterm"
-  ],
-  "author": {
-    "name": "Oleksandr Vasyliev",
-    "email": "infely@gmail.com",
-    "url": "https://github.com/infely"
-  },
-  "repository": "infely/react-curse",
-  "homepage": "https://github.com/infely/react-curse",
-  "main": "index.ts",
-  "license": "MIT",
+  "main": "./dist/index.js",
+  "license": "UNLICENSED",
   "type": "module",
   "scripts": {
-    "start": "npx esbuild ${npm_config_src:=examples/Example.tsx} --outfile=.dist/index.js --bundle --platform=node --format=esm --external:'./node_modules/*' --sourcemap && node --enable-source-maps .dist",
-    "npm": "npx esbuild index.ts --outdir=.npm --bundle --platform=node --format=esm --packages=external",
-    "postnpm": "tsc --emitDeclarationOnly --declaration --jsx react --target esnext --esModuleInterop --moduleResolution node index.ts --outdir .npm && bin/postnpm.js",
-    "create": "npx esbuild create/Create.tsx --outfile=.create/index.js --bundle --platform=node --define:'process.env.NODE_ENV=\"production\"' --minify --tree-shaking=true",
-    "postcreate": "bin/postcreate.js",
-    "dist": "npx esbuild ${npm_config_src:=examples/Example.tsx} --outfile=.dist/index.cjs --bundle --platform=node --define:'process.env.NODE_ENV=\"production\"' --minify --tree-shaking=true",
-    "logger": "bin/logger.js"
+    "build": "npx vite build",
+    "start": "npx vite build -c vite.config.example.ts && node ./dist/example.js"
   },
   "dependencies": {
-    "esbuild": "^0.25.5",
     "react": "18.3.1",
     "react-reconciler": "0.29.2"
   },
   "devDependencies": {
-    "@eslint/js": "^9.28.0",
-    "@trivago/prettier-plugin-sort-imports": "^5.2.2",
-    "@types/eslint__js": "8.42.3",
+    "@rollup/plugin-node-resolve": "^16.0.1",
     "@types/node": "^22.15.29",
     "@types/react": "18.3.1",
     "@types/react-reconciler": "0.28.9",
-    "eslint": "^9.28.0",
-    "eslint-plugin-react": "^7.37.5",
-    "prettier": "^3.5.3",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.33.1"
+    "vite": "^7.0.0",
+    "vite-plugin-dts": "^4.5.4",
+    "vite-tsconfig-paths": "^5.1.4"
   }
 }
