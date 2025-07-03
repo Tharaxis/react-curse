@@ -143,7 +143,7 @@ export class Screen {
 
     const modifiers = Object.fromEntries(
       ['color', 'background', 'bold', 'dim', 'italic', 'underline', 'blinking', 'inverse', 'strikethrough']
-        .map(i => [i, props[i] ?? (prevProps[i] as (Color | boolean | undefined)]))
+        .map(i => [i, props[i] ?? prevProps[i as "color" | "background" | "bold" | "dim" | "italic" | "underline" | "blinking" | "inverse" | "strikethrough"]])
         .filter(i => i[1])
     )
     if ((props.background || props.clear) && (props.width || props.height))

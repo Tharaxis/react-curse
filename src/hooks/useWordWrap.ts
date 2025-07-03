@@ -1,6 +1,6 @@
 import { useSize } from "./useSize";
 
-export default (text: string, _width: number | undefined = undefined) => {
+export function useWordWrap(text: string, _width: number | undefined = undefined): string {
   const width = _width ?? useSize().width
 
   return text

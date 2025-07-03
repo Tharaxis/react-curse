@@ -24,7 +24,7 @@ export class TextElement {
   }
 
   /** Clears all children. */
-  terminate(): void {
+  clear(): void {
     this._children = [];
   }
 
@@ -85,14 +85,6 @@ export class TextInstance {
   }
 
   /**
-   * Initializes a new instance of the TextInstance class.
-   * @param value The value.
-   */
-  constructor(value: string) {
-    this._value = value;
-  }
-
-  /**
    * Commits an update to the text.
    * @param value The new text value.
    */
@@ -106,6 +98,14 @@ export class TextInstance {
    */
   toString(): string {
     return this._value;
+  }
+
+  /**
+   * Initializes a new instance of the TextInstance class.
+   * @param value The value.
+   */
+  constructor(value: string) {
+    this._value = value;
   }
 }
 
