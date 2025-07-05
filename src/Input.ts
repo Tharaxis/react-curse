@@ -427,13 +427,18 @@ export class Input {
    */
   protected emit(type: "mouse", event: MouseEvent): void;
 
-  /** Emits an input event. */
+  /**
+   * Emits an input event.
+   * @param type The event type.
+   * @param event the event.
+   */
   protected emit(type: "key" | "mouse", event: InputEvent): void {
     this._emitter.emit(type, event);
   }
 
   /**
    * Registers a keyboard event listener.
+   * @param type The event type to listen to. Always `"key"`.
    * @param callback The function to call when a keyboard input occurs.
    * @returns A function which when called deregisters the input event.
    */
@@ -441,6 +446,7 @@ export class Input {
 
   /**
    * Registers a mouse event listener.
+   * @param type The event type to listen to. Always `"mouse"`.
    * @param callback The function to call when a mouse input occurs.
    * @returns A function which when called deregisters the input event.
    */
@@ -448,6 +454,7 @@ export class Input {
 
   /**
    * Registers an input event listener.
+   * @param type The event type to listen to.
    * @param callback The function to call when an input occurs.
    * @returns A function which when called deregisters the input event.
    */
@@ -481,7 +488,7 @@ export class Input {
     output.push("\x1B[?1015l");
   }
 
-  /** Disposes of the input. */
+  /** Cleans up input. */
   close(): void {
     this._emitter.removeAllListeners();
     this._stdin.off("data", this.onData);

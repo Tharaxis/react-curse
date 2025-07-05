@@ -1,3 +1,4 @@
+import Renderer from "./Renderer";
 import { type Char, type Color, type Modifier } from "./Screen";
 
 /** A position on screen. */
@@ -21,6 +22,161 @@ export class Terminal {
   private _previousModifier: Modifier;
   private _cursorPosition: Position;
   private _maxCursorPosition: Position;
+
+  private onResize = (): void => {
+    this._resized = true;
+  }
+
+  private createModifierSequence(modifier: Modifier): string {
+    if (JSON.stringify(modifier) === "{}") return "0";
+
+    const previousModifier = this._previousModifier;
+
+    const sequence: (number | string)[] = [];
+
+    if (modifier.color !== previousModifier.color) sequence.push(modifier.color ? this.parseColor(modifier.color) : 39);
+    if (modifier.background !== previousModifier.background) sequence.push(modifier.background ? this.parseColor(modifier.background, 10) : 49);
+    if (modifier.bold !== previousModifier.bold) sequence.push(modifier.bold ? 1 : modifier.dim ? '22;2' : 22);
+    if (modifier.dim !== previousModifier.dim) sequence.push(modifier.dim ? 2 : modifier.bold ? '22;1' : 22);
+    if (modifier.italic !== previousModifier.italic) sequence.push(modifier.italic ? 3 : 23);
+    if (modifier.underline !== previousModifier.underline) sequence.push(modifier.underline ? 4 : 24);
+    if (modifier.blinking !== previousModifier.blinking) sequence.push(modifier.blinking ? 5 : 25);
+    if (modifier.inverse !== previousModifier.inverse) sequence.push(modifier.inverse ? 7 : 27);
+    if (modifier.strikethrough !== previousModifier.strikethrough) sequence.push(modifier.strikethrough ? 9 : 29);
+
+    return sequence.join(';');
+  }
+
+  /**
+   * Indicates whether the specified character represents an icon.
+   * @returns `True` if an icon, otherwise `false`.
+   */
+  isIcon(char: string): boolean {
+    const code = char.charCodeAt(0);
+    return (code >= 9211 && code <= 9214) || [9829, 9889, 11096].includes(code) || (code >= 57344 && code <= 64838);
+  }
+
+  /**
+   * 
+   * @param buffer 
+   */
+  render(buffer: ReadonlyArray<ReadonlyArray<Char>>): void {
+    let result = "";
+
+    const resized = this._resized;
+
+    if (resized) {
+      result += "\x1Bc";
+      result += "\x1B[H";
+    
+      // because we clear we have to re-init input.
+      const output: Array<string> = [];
+      Renderer["_input"]?.setup(output);
+      result += output.join("");
+
+      this._cursorPosition = { x: 0, y: 0 };
+      this._resized = false;
+    }
+
+
+    for (let y = 0; y < buffer.length; y++) {
+      const line = buffer[y];
+      const prevLine = this._previousBuffer?.[y];
+      let includesEmoji = false;
+      let includesIcon = false;
+
+      const diffLine = resized ? line : line.map((i: Char, x: number) => {
+        const [prevChar, prevModifier] = prevLine && prevLine[x] ? prevLine[x] : [" ", {}];
+        const [char, modifier] = i;
+        return (this._resized || prevChar !== char || JSON.stringify(prevModifier) !== JSON.stringify(modifier)) ? i : null;
+      })
+      .filter(i => i !== undefined);
+
+      const chunks: Record<number, [string, string]> = {};
+      let chunksAt = 0;
+      diffLine.forEach((value, x: number) => {
+        if (value === null) return (chunksAt = x + 1);
+
+        const [char, modifier] = value;
+        if (chunks[chunksAt] === undefined) chunks[chunksAt] = ["", ""];
+        if (JSON.stringify(modifier) !== JSON.stringify(this._previousModifier)) {
+          chunks[chunksAt][1] += `\x1B[${this.createModifierSequence(modifier)}m`;
+          this._previousModifier = modifier;
+        }
+        chunks[chunksAt][0] += char;
+        chunks[chunksAt][1] += char;
+      });
+
+      Object.entries(chunks).map(([index, value]) => {
+        const [str, strWithModifiers] = value as [string, string];
+        const x = parseInt(index);
+
+        if (/\p{Emoji}/u.test(str)) includesEmoji = true;
+        if (!includesIcon && str.split("").find((i) => this.isIcon(i))) includesIcon = true;
+
+        if (x === 0 && y === this._cursorPosition.y + 1) {
+          if (this._fullscreen)
+            result += `\x1B[${y + 1};1H`;
+          else
+            result += "\n";
+        } else {
+          if (!this._fullscreen && y > this._cursorPosition.y && y > this._maxCursorPosition.y) {
+            const diff = y - this._maxCursorPosition.y;
+            result += "\n".repeat(diff);
+            this._cursorPosition = { y: this._cursorPosition.y + diff, x: 0 };
+          }
+
+          if (y !== this._cursorPosition.y && x !== this._cursorPosition.x) {
+            result += `\x1B[${y + 1};${x + 1}H`;        // moves cursor to position
+          } else if (y > this._cursorPosition.y) {
+            const diff = y - this._cursorPosition.y;
+            result += `\x1B[${diff > 1 ? diff : ""}B`;  // moves cursor down
+          } else if (y < this._cursorPosition.y) {
+            const diff = this._cursorPosition.y - y;
+            result += `\x1B[${diff > 1 ? diff : ""}A`;  // moves cursor up
+          } else if (x > this._cursorPosition.x) {
+            if (includesEmoji || includesIcon) {
+              result += `\x1B[G\x1B[${x > 1 ? x : ""}C`;  // moves cursor to column, moves cursor right
+            } else {
+              const diff = x - this._cursorPosition.x;
+              result += `\x1B[${diff > 1 ? diff : ""}C`;  // moves cursor right
+            }
+          } else if (x < this._cursorPosition.x) {
+            if (includesEmoji) {
+              result += `\x1B[G\x1B[${x > 1 ? x : ""}C`;  // moves cursor left
+            } else {
+              const diff = this._cursorPosition.x - x;
+              result += `\x1B[${diff > 1 ? diff : ""}D`;  // moves cursor left
+            }
+          }
+        }
+
+        result += strWithModifiers;
+
+        this._cursorPosition = { x: x + str.length, y };
+      });
+
+      if (this._cursorPosition.x > this._maxCursorPosition.x) this._maxCursorPosition.x = this._cursorPosition.x;
+      if (this._cursorPosition.y > this._maxCursorPosition.y) this._maxCursorPosition.y = this._cursorPosition.y;
+    }
+
+    this._previousBuffer = buffer;
+
+    if (this._nextWritePrefix) {
+      result = this._nextWritePrefix + result;
+      this._nextWritePrefix = "";
+    }
+
+    if (result) this._stdout.write(result);
+  }  
+
+  /**
+   * Appends the specified value to the data output at the beginning of the next terminal write.
+   * @param value The value to append.
+   */
+  append(value: string): void {
+    this._nextWritePrefix += value;
+  }
 
   /**
    * Parses a hex color string.
@@ -91,6 +247,7 @@ export class Terminal {
     if (this._fullscreen) {
       output.push("\x1B[?1049h");
       output.push("\x1Bc");
+      output.push("\x1B[?7l");
     }
 
     output.push("\x1B[?25l");
@@ -104,6 +261,7 @@ export class Terminal {
     if (this._fullscreen) {
       output.push("\x1B[?1049l");
       output.push("\x1Bc");
+      output.push("\x1B[?7h");
     } else {
       const y = this._maxCursorPosition.y - this._cursorPosition.y
       if (y > 0) output.push(`\x1B[${y}B`);
@@ -114,6 +272,11 @@ export class Terminal {
 
     output.push("\x1B[?25h");
   }  
+
+  /** Cleans up input. */
+  close(): void {
+    this._stdout.off("resize", this.onResize);
+  }
 
   /**
    * Initializes a new instance of the Terminal class.
@@ -129,167 +292,6 @@ export class Terminal {
     this._previousBuffer = null;
     this._cursorPosition = { x: 0, y: 0 };
     this._maxCursorPosition = { x: 0, y: 0 };
-
-    this._stdout.on("resize", (): void => {
-      this._resized = true;
-    });
-  }
-
-  /** Refreshes the terminal. */
-  refresh(): void {
-    this._previousModifier = {};
-    this._previousBuffer = null;
-
-    const output: Array<string> = [];
-    this.setup(output);
-    this.append(output.join(""));
-  }
-
-  /**
-   * Appends the specified value to the data output at the beginning of the next terminal write.
-   * @param value The value to append.
-   */
-  append(value: string): void {
-    this._nextWritePrefix += value;
-  }
-
-  close(): void {
-
-  }
-
-  createModifierSequence(modifier: Modifier) {
-    if (JSON.stringify(modifier) === '{}') return '0'
-
-    const previousModifier = this._previousModifier;
-
-    const sequence: (number | string)[] = []
-
-    if (modifier.color !== previousModifier.color) sequence.push(modifier.color ? this.parseColor(modifier.color) : 39)
-    if (modifier.background !== previousModifier.background)
-      sequence.push(modifier.background ? this.parseColor(modifier.background, 10) : 49)
-    if (modifier.bold !== previousModifier.bold) sequence.push(modifier.bold ? 1 : modifier.dim ? '22;2' : 22)
-    if (modifier.dim !== previousModifier.dim) sequence.push(modifier.dim ? 2 : modifier.bold ? '22;1' : 22)
-    if (modifier.italic !== previousModifier.italic) sequence.push(modifier.italic ? 3 : 23)
-    if (modifier.underline !== previousModifier.underline) sequence.push(modifier.underline ? 4 : 24)
-    if (modifier.blinking !== previousModifier.blinking) sequence.push(modifier.blinking ? 5 : 25)
-    if (modifier.inverse !== previousModifier.inverse) sequence.push(modifier.inverse ? 7 : 27)
-    if (modifier.strikethrough !== previousModifier.strikethrough) sequence.push(modifier.strikethrough ? 9 : 29)
-
-    return sequence.join(';')
-  }
-
-  /**
-   * Indicates whether the specified character represents an icon.
-   * @returns `True` if an icon, otherwise `false`.
-   */
-  isIcon(char: string): boolean {
-    const code = char.charCodeAt(0)
-    return (code >= 9211 && code <= 9214) || [9829, 9889, 11096].includes(code) || (code >= 57344 && code <= 64838);
-  }
-
-  render(buffer: ReadonlyArray<ReadonlyArray<Char>>): void {
-    let result = "";
-
-    const resized = this._resized;
-
-    if (resized) {
-      result += "\x1B[H";
-      this._cursorPosition = { x: 0, y: 0 };
-      this._resized = false;
-    }
-
-    for (let y = 0; y < buffer.length; y++) {
-      const line = buffer[y]
-      const prevLine = this._previousBuffer?.[y]
-      let includesEmoji = false
-      let includesIcon = false
-
-      const diffLine = resized
-        ? line
-        : line
-            .map((i: Char, x: number) => {
-              const [prevChar, prevModifier] = prevLine && prevLine[x] ? prevLine[x] : [' ', {}]
-              const [char, modifier] = i
-              return this._resized || prevChar !== char || JSON.stringify(prevModifier) !== JSON.stringify(modifier)
-                ? i
-                : null
-            })
-            .filter(i => i !== undefined)
-
-      const chunks: Record<number, [string, string]> = {}
-      let chunksAt = 0
-      diffLine.forEach((value, x: number) => {
-        if (value === null) return (chunksAt = x + 1)
-
-        const [char, modifier] = value
-        if (chunks[chunksAt] === undefined) chunks[chunksAt] = ['', '']
-        if (JSON.stringify(modifier) !== JSON.stringify(this._previousModifier)) {
-          chunks[chunksAt][1] += `\x1b[${this.createModifierSequence(modifier)}m`;
-          this._previousModifier = modifier;
-        }
-        chunks[chunksAt][0] += char
-        chunks[chunksAt][1] += char
-      })
-
-      Object.entries(chunks).map(([index, value]) => {
-        const [str, strWithModifiers] = value as [string, string]
-        const x = parseInt(index)
-        if (/\p{Emoji}/u.test(str)) includesEmoji = true
-        if (!includesIcon && str.split('').find((i: string) => this.isIcon(i))) includesIcon = true
-
-        if (x === 0 && y === this._cursorPosition.y + 1) {
-          result += '\n'
-        } else {
-          if (!this._fullscreen && y > this._cursorPosition.y && y > this._maxCursorPosition.y) {
-            const diff = y - this._maxCursorPosition.y
-            result += '\n'.repeat(diff)
-            this._cursorPosition = { y: this._cursorPosition.y + diff, x: 0 }
-          }
-
-          if (y !== this._cursorPosition.y && x !== this._cursorPosition.x) {
-            result += `\x1B[${y + 1};${x + 1}H` // moves cursor to position
-          } else if (y > this._cursorPosition.y) {
-            const diff = y - this._cursorPosition.y
-            result += `\x1B[${diff > 1 ? diff : ''}B` // moves cursor down
-          } else if (y < this._cursorPosition.y) {
-            const diff = this._cursorPosition.y - y
-            result += `\x1B[${diff > 1 ? diff : ''}A` // moves cursor up
-          } else if (x > this._cursorPosition.x) {
-            if (includesEmoji || includesIcon) {
-              result += `\x1B[G\x1B[${x > 1 ? x : ''}C` // moves cursor to column, moves cursor right
-            } else {
-              const diff = x - this._cursorPosition.x
-              result += `\x1B[${diff > 1 ? diff : ''}C` // moves cursor right
-            }
-          } else if (x < this._cursorPosition.x) {
-            if (includesEmoji) {
-              result += `\x1B[G\x1B[${x > 1 ? x : ''}C` // moves cursor left
-            } else {
-              const diff = this._cursorPosition.x - x
-              result += `\x1B[${diff > 1 ? diff : ''}D` // moves cursor left
-            }
-          }
-        }
-        result += strWithModifiers
-
-        this._cursorPosition = { x: x + str.length, y }
-      })
-      // if (this.cursor.x > buffer[y].length - 1) {
-      //   this.cursor = { x: 0, y: 0 }
-      //   result += `${ESC}[H` // moves cursor to home position
-      // }
-      if (this._cursorPosition.x > this._maxCursorPosition.x) this._maxCursorPosition.x = this._cursorPosition.x
-      if (this._cursorPosition.y > this._maxCursorPosition.y) this._maxCursorPosition.y = this._cursorPosition.y
-    }
-    this._previousBuffer = buffer;
-
-    if (this._nextWritePrefix) {
-      result = this._nextWritePrefix + result;
-      this._nextWritePrefix = "";
-    }
-
-    if (result) {
-      process.stdout.write(result)
-    }
+    this._stdout.on("resize", this.onResize);
   }
 }

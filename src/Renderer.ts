@@ -1,7 +1,7 @@
 import { type ReactElement } from "react";
 import { Input } from "./Input";
 import { Reconciler, TextElement } from "./Reconciler";
-import { Screen } from "./Screen";
+import Screen from "./Screen";
 import { Terminal } from "./Terminal";
 
 /** The rendering options. */
@@ -22,7 +22,6 @@ class Renderer {
 
   private _terminal: Terminal | null;
   private _input: Input | null;
-  private _screen: Screen | null;
   private _reconciler: ReturnType<typeof Reconciler> | null;
   private _root: TextElement | null;
   private _stdout: NodeJS.WritableStream | null;
@@ -32,7 +31,7 @@ class Renderer {
    * @param reactElement The element to render.
    * @param options The rendering options.
    */
-  render(reactElement: ReactElement, options: RenderOptions): void {
+  render(reactElement: ReactElement, options?: RenderOptions): void {
     const { mode = "fullscreen", stdin = process.stdin, stdout = process.stdout } = options ?? {};
 
     let fullscreen = false;
@@ -50,7 +49,6 @@ class Renderer {
     this._terminal = new Terminal(stdout, fullscreen);
     this._input = new Input(stdin);
     this._root = new TextElement();
-    this._screen = new Screen();
 
     const onExit = (code: number): void => {
       if (code !== 0) return;
@@ -67,21 +65,17 @@ class Renderer {
     this._input.setup(output);
     this._terminal.append(output.join(""));
 
-    let throttleAt = 0;
-    let throttleTimeout: NodeJS.Timeout;
+    let throttleTimeout: ReturnType<typeof setImmediate>;
 
     this._reconciler = Reconciler(() => {
-      const at = Date.now();
-      const nextAt = Math.max(0, 1000 / 60 - (at - throttleAt));
-      clearTimeout(throttleTimeout);
+      clearImmediate(throttleTimeout);
 
-      throttleTimeout = setTimeout(() => {
-        throttleAt = at;
-        if (!this._screen || !this._terminal) return;
+      throttleTimeout = setImmediate(() => {
+        if (!this._terminal) return;
 
-        this._screen.render(this._root?.children ?? []);
-        this._terminal.render(this._screen.buffer);
-      }, nextAt);
+        Screen.render(this._root?.children ?? []);
+        this._terminal.render(Screen.buffer);
+      });
     });
 
     this._reconciler.updateContainer(reactElement, this._reconciler.createContainer(this._root, 0, null, false, null, "", () => {}, null));
@@ -106,7 +100,6 @@ class Renderer {
     this._stdout?.write(output.join(""));
     
     this._reconciler = null;
-    this._screen = null;
     this._root = null;
     this._stdout = null;
   }
@@ -115,7 +108,6 @@ class Renderer {
   constructor() {
     this._terminal = null;
     this._input = null;
-    this._screen = null;
     this._reconciler = null;
     this._root = null;
     this._stdout = null;
