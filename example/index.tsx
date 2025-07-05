@@ -1,5 +1,5 @@
 import { ReactNode, useState } from "react";
-import Renderer, { Text, Canvas, useSize, Button } from "../dist/index.js";
+import Renderer, { Text, Canvas, useSize, Button, useInput } from "../dist/index.js";
 
 export const Logo = (): ReactNode => {
   return (
@@ -39,6 +39,10 @@ const App = (): ReactNode => {
   const { width } = useSize();
 
   const [tab, setTab] = useState(0);
+
+  useInput(() => {
+
+  }, []);
 
   return (
     <>

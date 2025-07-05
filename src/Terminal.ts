@@ -1,4 +1,3 @@
-import Renderer from "./Renderer";
 import { type Char, type Color, type Modifier } from "./Screen";
 
 /** A position on screen. */
@@ -66,18 +65,10 @@ export class Terminal {
     const resized = this._resized;
 
     if (resized) {
-      result += "\x1Bc";
       result += "\x1B[H";
-    
-      // because we clear we have to re-init input.
-      const output: Array<string> = [];
-      Renderer["_input"]?.setup(output);
-      result += output.join("");
-
       this._cursorPosition = { x: 0, y: 0 };
       this._resized = false;
     }
-
 
     for (let y = 0; y < buffer.length; y++) {
       const line = buffer[y];
@@ -115,10 +106,10 @@ export class Terminal {
         if (!includesIcon && str.split("").find((i) => this.isIcon(i))) includesIcon = true;
 
         if (x === 0 && y === this._cursorPosition.y + 1) {
-          if (this._fullscreen)
-            result += `\x1B[${y + 1};1H`;
-          else
-            result += "\n";
+          //if (this._fullscreen)
+            //result += `\x1B[${y + 1};1H`; // is this faster? dunno...
+          //else
+          result += "\n";
         } else {
           if (!this._fullscreen && y > this._cursorPosition.y && y > this._maxCursorPosition.y) {
             const diff = y - this._maxCursorPosition.y;
@@ -246,8 +237,8 @@ export class Terminal {
   setup(output: Array<string>): void {
     if (this._fullscreen) {
       output.push("\x1B[?1049h");
-      output.push("\x1Bc");
       output.push("\x1B[?7l");
+      output.push("\x1B[H");
     }
 
     output.push("\x1B[?25l");
@@ -260,7 +251,6 @@ export class Terminal {
   teardown(output: Array<string>): void {
     if (this._fullscreen) {
       output.push("\x1B[?1049l");
-      output.push("\x1Bc");
       output.push("\x1B[?7h");
     } else {
       const y = this._maxCursorPosition.y - this._cursorPosition.y

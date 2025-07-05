@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { Text, TextProps } from "./Text";
 import { useChildrenSize } from "../hooks/useChildrenSize";
 import { Offset } from "../hooks/useParentOffset";
-import { useMouse } from "../hooks/useMouse";
+import { useMouse } from "../Input";
 
 /** The Button component properties. */
 export interface ButtonProps extends TextProps {

@@ -24,8 +24,10 @@ function getSize(): Size {
 }
 
 process.stdout.on("resize", () => {
-  const size = getSize()
-  EventSubscribers.forEach((_, fn) => fn(size))
+  const size = getSize();
+
+  for (const callback of EventSubscribers)
+    callback(size);
 });
 
 /**
@@ -36,12 +38,12 @@ export function useSize(): Size {
   const [size, setSize] = useState(getSize());
 
   useEffect(() => {
-    EventSubscribers.add(setSize)
+    EventSubscribers.add(setSize);
 
     return () => {
-      EventSubscribers.delete(setSize)
-    }
-  }, [])
+      EventSubscribers.delete(setSize);
+    };
+  }, []);
 
-  return size
+  return size;
 }

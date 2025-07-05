@@ -1,4 +1,6 @@
 import EventEmitter from "node:events";
+import { DependencyList, useEffect } from "react";
+import Renderer from "./Renderer";
 
 /** The set of available input keys. */
 export enum Key {
@@ -509,4 +511,35 @@ export class Input {
     stdin.setRawMode(true);
     this._stdin.on("data", this.onData);
   }
+}
+
+/**
+ * Provides access to keyboard input events.
+ * @param callback The function to call on each input event.
+ * @param deps The optional set of dependencies used by the callback function.
+ */
+export function useInput(callback: InputEventCallback<KeyEvent>, deps: DependencyList = []): void {
+  useEffect(() => {
+    return Renderer["_input"]?.on?.("key", (event) => {
+      const { key, modifiers } = event;
+
+      if (modifiers.ctrl && key === "c")
+        process.exit();
+
+      callback(event);
+    });
+  }, deps)
+}
+
+/**
+ * Provides access to mouse input events.
+ * @param callback The function to call on each mouse event.
+ * @param deps The optional set of dependencies used by the callback function.
+ */
+export function useMouse(callback: InputEventCallback<MouseEvent>, deps: DependencyList = []): void {
+  useEffect(() => {
+    return Renderer["_input"]?.on?.("mouse", (event) => {
+      callback(event);
+    });
+  }, deps)
 }

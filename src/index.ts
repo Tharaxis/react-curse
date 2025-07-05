@@ -1,5 +1,7 @@
 export { default } from "./Renderer";
 export {
+  useInput,
+  useMouse,
   Key,
   type InputEventCallback,
   type InputModifiers,
@@ -13,8 +15,6 @@ export {
   type MouseMode
 } from "./Input";
 export * from "./hooks/useChildrenSize";
-export * from "./hooks/useInput";
-export * from "./hooks/useMouse";
 export * from "./hooks/useSize";
 export { useParentOffset, type Offset } from "./hooks/useParentOffset";
 export * from "./hooks/useWordWrap";

@@ -97,7 +97,7 @@ class Screen {
   /** Generates the buffer. */
   private generateBuffer(): Array<Array<Char>> {
     this._size = { x1: 0, y1: 0, x2: process.stdout.columns, y2: process.stdout.rows };
-    return [...Array(this._size.y2)].map(() => [...Array(this._size.x2)].map(() => [' ', {}] as Char));
+    return [...Array(this._size.y2)].map(() => [...Array(this._size.x2)].map(() => [" ", {}] as Char));
   }
 
   /** Clears the buffer. */
